@@ -42,7 +42,7 @@ func debounce( _ delay:TimeInterval, queue:DispatchQueue, action: @escaping (()-
 
 // NOTE: Delegate pattern to do things in the normal (Apple) way, without Blaze/React
 
-@objc protocol MeteorCollectionDelegate: class {
+@objc public protocol MeteorCollectionDelegate: class {
 	@objc optional func collectionChanged(_ collection: String)
 
 	@objc optional func documentAdded(_ collection: String, document: MeteorDocument)
@@ -64,11 +64,15 @@ open class MeteorCollection<T:MeteorDocument>: AbstractCollection {
     })
 
     var documents = [String:T]()
-	var delegate: MeteorCollectionDelegate?
+	open var delegate: MeteorCollectionDelegate?
 
     open var sorted:[T] {
         return Array(documents.values).sorted(by: { $0._id > $1._id })
-    }
+	}
+	
+	open var fetch:[T] {
+		return Array(documents.values)
+	}
 
     /**
     Returns the number of documents in the collection
@@ -121,10 +125,8 @@ open class MeteorCollection<T:MeteorDocument>: AbstractCollection {
         let document = T(id: id, fields: fields)
         self.documents[id] = document
         collectionSetDidChange()
-		if (delegate != nil) {
-			delegate?.collectionChanged!(collection)
-			delegate?.documentAdded!(collection, document: document)
-		}
+		delegate?.collectionChanged?(collection)
+		delegate?.documentAdded?(collection, document: document)
     }
 
     /**
@@ -141,10 +143,8 @@ open class MeteorCollection<T:MeteorDocument>: AbstractCollection {
             document.update(fields, cleared: cleared)
             self.documents[id] = document
 			collectionSetDidChange()
-			if (delegate != nil) {
-				delegate?.collectionChanged!(collection)
-				delegate?.documentChanged!(collection, document: document, cleared: cleared)
-			}
+			delegate?.collectionChanged?(collection)
+			delegate?.documentChanged?(collection, document: document, cleared: cleared)
         }
     }
 
@@ -159,10 +159,8 @@ open class MeteorCollection<T:MeteorDocument>: AbstractCollection {
         if let _ = documents[id] {
             self.documents[id] = nil
             collectionSetDidChange()
-			if (delegate != nil) {
-				delegate?.collectionChanged!(collection)
-				delegate?.documentRemoved!(collection, id: id)
-			}
+			delegate?.collectionChanged?(collection)
+			delegate?.documentRemoved?(collection, id: id)
         }
     }
 
@@ -181,6 +179,7 @@ open class MeteorCollection<T:MeteorDocument>: AbstractCollection {
             if error != nil {
                 self.documents[document._id] = nil
                 self.collectionSetDidChange()
+				self.delegate?.collectionChanged?(self.name)
                 log.error("\(error!)")
             }
 
@@ -206,6 +205,7 @@ open class MeteorCollection<T:MeteorDocument>: AbstractCollection {
             if error != nil {
                 self.documents[document._id] = originalDocument
                 self.collectionSetDidChange()
+				self.delegate?.collectionChanged?(self.name)
                 log.error("\(error!)")
             }
 
@@ -228,15 +228,13 @@ open class MeteorCollection<T:MeteorDocument>: AbstractCollection {
         let fields = document.fields()
 
         client.update(self.name, document: [["_id":document._id],["$set":fields]]) { result, error in
-
             if error != nil {
                 self.documents[document._id] = originalDocument
                 self.collectionSetDidChange()
+				self.delegate?.collectionChanged?(self.name)
                 log.error("\(error!)")
             }
-
         }
-
     }
 
     /**
@@ -253,6 +251,7 @@ open class MeteorCollection<T:MeteorDocument>: AbstractCollection {
             if error != nil {
                 self.documents[document._id] = document
                 self.collectionSetDidChange()
+				self.delegate?.collectionChanged?(self.name)
                 log.error("\(error!)")
             }
 
